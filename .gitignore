@@ -1,0 +1,10 @@
+out/*
+*.iml
+target/*
+*.log
+.idea/*
+*.un~
+.fuse*
+texts/*
+build/*
+
