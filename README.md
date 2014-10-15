@@ -20,8 +20,13 @@ Simple implementation of concurrent [inverted indexer](http://en.wikipedia.org/w
     *  `mvn clean package`
     * in **build** directory will appear **simpleindexer.jar**
 
-### Examples ###
+### Example ###
 ```java
 WordToPathIndex index = new WordToPathIndex(FileSystems.getDefault());
-index.startWatch(Paths.get(System.getProperty("user.dir"), "src"));
+String pathToIndexerSrc = System.getProperty("user.dir");
+index.startWatch(Paths.get(pathToIndexerSrc, "src"));
+out(index.getPathsByWord("public"));
+index.stopWatch(Paths.get(pathToIndexerSrc, "src/main/java/simpleindexer/fs"));
+out(index.getPathsByWord("public"));
+index.shutdown();
 ```
