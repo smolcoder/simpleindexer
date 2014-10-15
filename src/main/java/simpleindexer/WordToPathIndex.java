@@ -149,7 +149,7 @@ public class WordToPathIndex {
 
     /**
      * Start watching path specified {@code root}.
-     * Does nothing if either {@code root} is already watched or {@code root} is directory.
+     * Does nothing if either {@code root} is already watched or {@code root} is not a directory.
      * Operation is thread-safe.
      *
      * @param root start watching to.
@@ -160,7 +160,7 @@ public class WordToPathIndex {
 
     /**
      * Start watching path specified {@code root}.
-     * Does nothing if either {@code root} is already watched or {@code root} is directory.
+     * Does nothing if either {@code root} is already watched or {@code root} is not a directory.
      * Operation is thread-safe.
      *
      * @param root start watching to.
@@ -180,7 +180,7 @@ public class WordToPathIndex {
 
     /**
      * Stop watching path specified by {@code root}.
-     * Does nothing if either {@code root} is already watched or {@code root} is directory.
+     * Does nothing if either {@code root} is already unwatched or {@code root} is not a directory.
      * Operation is thread-safe.
      *
      * @param root stop watching to.
@@ -191,12 +191,16 @@ public class WordToPathIndex {
 
     /**
      * Stop watching path specified by {@code root}.
-     * Does nothing if either {@code root} is already watched or {@code root} is directory.
+     * Does nothing if either {@code root} is already unwatched or {@code root} is not a directory.
      * Operation is thread-safe.
      *
      * @param root stop watching to.
      */
     public void stopWatch(Path root) {
+        if (!Files.isDirectory(root)) {
+            log.warn("Path {} is not a directory.", root);
+            return;
+        }
         if (!fsRegistrar.isRegistered(root)) {
             log.warn("Path {} isn't registered. Nothing to stop.", root);
             return;

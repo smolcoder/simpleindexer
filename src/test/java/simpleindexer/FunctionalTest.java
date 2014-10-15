@@ -256,6 +256,13 @@ public class FunctionalTest extends IndexTestBase {
     }
 
     @Test
+    public void startWatchNotExistingTest() throws InterruptedException, IOException, IndexException {
+        index.startWatch(Paths.get(testDirPath, "foo1", "file1"));
+        matchAnyTestDir("aaaa", testDirPath, "foo1/file1");
+        index.startWatch(Paths.get(testDirPath, "foo1", "notexisting"));
+    }
+
+    @Test
     public void stopWatchExistingRootTest() throws InterruptedException, IOException, IndexException {
         index.stopWatch(testDirPath);
         Thread.sleep(sleepTimeBeforeMatching);
@@ -281,6 +288,13 @@ public class FunctionalTest extends IndexTestBase {
         matchAll("cccc", "foo1/file3", "foo1/bar2/foo3/foo4/file1");
         matchAll("aaaa", "foo1/bar2/file1", "foo1/file1");
         matchAll("designed", "foo1/foo2/file1");
+    }
+
+    @Test
+    public void stopWatchNotExistingTest() throws InterruptedException, IOException, IndexException {
+        index.stopWatch(Paths.get(testDirPath, "foo1", "file1"));
+        matchAnyTestDir("aaaa", testDirPath, "foo1/file1");
+        index.stopWatch(Paths.get(testDirPath, "foo1", "notexisting"));
     }
 
     @Test
