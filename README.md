@@ -48,9 +48,32 @@ index.shutdown();
 ### Comand-line usage exapmle ####
 Run indexer (from relative to simpleindexer/):
 ```bash
-java -jar simpleindexer.jar
+java -jar build/simpleindexer.jar
 ```
-Run indexer (from relative to simpleindexer/):
+Run indexer with indexer options:
 ```bash
-java -jar simpleindexer.jar
+java -jar -Dindexer.threads.count=2 build/simpleindexer.jar
 ```
+Interactive prompt will appear as indexer started.
+
+Print help:
+```bash
+>> h
+```
+
+Add directory:
+```bash
+>> add ../somePathRelativeToSimpleindexer
+```
+
+Remove directory:
+```bash
+>> rm ../somePathRelativeToSimpleindexer
+```
+
+List all files than contain word "example":
+```bash
+>> find example
+```
+
+Note: do not add src/ path to indexer when loggin is switched-on.
