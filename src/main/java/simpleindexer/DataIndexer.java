@@ -2,6 +2,7 @@ package simpleindexer;
 
 
 import org.jetbrains.annotations.NotNull;
+import simpleindexer.exceptions.IndexException;
 
 import java.io.IOException;
 import java.util.Map;

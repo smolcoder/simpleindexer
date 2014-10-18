@@ -1,5 +1,6 @@
 package simpleindexer;
 
+import simpleindexer.exceptions.IndexException;
 import simpleindexer.valuestorages.ValueStorage;
 import org.jetbrains.annotations.Nullable;
 
@@ -21,7 +22,7 @@ public interface Index<K, V, D> {
      *
      * @param key key to search in index
      * @return {@link simpleindexer.valuestorages.ValueStorage} if there is data fot specified {@code key} or {@code null}
-     * @throws IndexException
+     * @throws simpleindexer.exceptions.IndexException
      */
     @Nullable
     public ValueStorage<V> get(K key) throws IndexException;

@@ -1,5 +1,6 @@
 package simpleindexer;
 
+import simpleindexer.exceptions.IndexException;
 import simpleindexer.valuestorages.ValueStorage;
 import org.jetbrains.annotations.Nullable;
 
@@ -19,7 +20,7 @@ public interface IndexStorage<K, V> {
      *
      * @param key used to add value
      * @param value to add
-     * @throws IndexException
+     * @throws simpleindexer.exceptions.IndexException
      */
     public void add(K key, V value) throws IndexException;
 

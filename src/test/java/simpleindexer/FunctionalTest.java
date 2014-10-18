@@ -7,6 +7,7 @@ import org.junit.Test;
 import org.junit.rules.MethodRule;
 import org.junit.rules.TestWatchman;
 import org.junit.runners.model.FrameworkMethod;
+import simpleindexer.exceptions.IndexException;
 
 import java.io.*;
 import java.nio.file.*;
@@ -66,8 +67,6 @@ public class FunctionalTest extends IndexTestBase {
             e.printStackTrace();
         }
     }
-
-
 
     @Test
     public void afterIndexInitializeQueryTest() throws InterruptedException, IndexException {
@@ -255,10 +254,13 @@ public class FunctionalTest extends IndexTestBase {
         afterIndexInitializeQueryTest();
     }
 
-    @Test
-    public void startWatchNotExistingTest() throws InterruptedException, IOException, IndexException {
+    @Test(expected = NoSuchFileException.class)
+    public void startWatchFileTest() throws InterruptedException, IOException, IndexException {
         index.startWatch(Paths.get(testDirPath, "foo1", "file1"));
-        matchAnyTestDir("aaaa", testDirPath, "foo1/file1");
+    }
+
+    @Test(expected = NoSuchFileException.class)
+    public void startWatchNotExistingTest() throws InterruptedException, IOException, IndexException {
         index.startWatch(Paths.get(testDirPath, "foo1", "notexisting"));
     }
 
@@ -290,16 +292,20 @@ public class FunctionalTest extends IndexTestBase {
         matchAll("designed", "foo1/foo2/file1");
     }
 
-    @Test
-    public void stopWatchNotExistingTest() throws InterruptedException, IOException, IndexException {
+    @Test(expected = NoSuchFileException.class)
+    public void stopWatchFileTest() throws InterruptedException, IOException, IndexException {
         index.stopWatch(Paths.get(testDirPath, "foo1", "file1"));
-        matchAnyTestDir("aaaa", testDirPath, "foo1/file1");
-        index.stopWatch(Paths.get(testDirPath, "foo1", "notexisting"));
     }
 
-    @Test
-    public void stopWatchNotExistingRootTest() throws InterruptedException, IOException, IndexException {
+    @Test(expected = NoSuchFileException.class)
+    public void stopWatchNotExistingRootTest1() throws InterruptedException, IOException, IndexException {
         index.stopWatch("/not/existing/root/");
+        Thread.sleep(sleepTimeBeforeMatching);
+        afterIndexInitializeQueryTest();
+    }
+
+    @Test(expected = NoSuchFileException.class)
+    public void stopWatchNotExistingRootTest2() throws InterruptedException, IOException, IndexException {
         index.stopWatch(Paths.get(testDirPath, "foo1/foo2/notexists/"));
         Thread.sleep(sleepTimeBeforeMatching);
         afterIndexInitializeQueryTest();
@@ -365,6 +371,7 @@ public class FunctionalTest extends IndexTestBase {
         executor.shutdown();
     }
 
+    // this test is allowed to fail, since it is strongly depends on OS/hardware.
     @Test
     public void bigFilesTest() throws IOException, InterruptedException, IndexException {
         // it supposed that MAX_FILE_SIZE_IN_BYTES = 1024 * 1024 * 30 in FileWrapper
@@ -372,10 +379,10 @@ public class FunctionalTest extends IndexTestBase {
         generateBigFile(2 * 1024 * 1024, testDirPath, "big2"); // too big
         generateBigFile(1 * 1024 * 1024, testDirPath, "big3"); // ok
         generateBigFile(512 * 1024, testDirPath, "big4");      // ok
-        Thread.sleep(sleepTimeBeforeMatching);
+        Thread.sleep(6000);
         matchAll("AAA", "big3", "big4");
-        matchCount("BBB", 2);
-        matchCount("CCC", 2);
+        matchAll("BBB", "big3", "big4");
+        matchAll("CCC", "big3", "big4");
     }
 
 }

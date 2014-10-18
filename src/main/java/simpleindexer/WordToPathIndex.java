@@ -1,6 +1,10 @@
 package simpleindexer;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
+import simpleindexer.exceptions.FileHasZeroLengthException;
+import simpleindexer.exceptions.FileTooBigIndexException;
+import simpleindexer.exceptions.IndexException;
+import simpleindexer.exceptions.IndexIllegalStateException;
 import simpleindexer.fs.*;
 import simpleindexer.valuestorages.ValueStorage;
 import org.jetbrains.annotations.NotNull;
@@ -79,6 +83,7 @@ public class WordToPathIndex {
         log.info("Initializing index...");
         this.watchService = checkNotNull(fileSystem, "fileSystem").newWatchService();
         this.properties = checkNotNull(properties, "properties");
+        log.info("Properties: {}", properties);
         int nThreads = properties.getIndexingThreadsCountProperty();
         executor = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, executorQueue);
         FSEventDispatcher<FSEventListener> fsEventDispatcher = new FSEventDispatcher<>();
@@ -149,27 +154,26 @@ public class WordToPathIndex {
 
     /**
      * Start watching path specified {@code root}.
-     * Does nothing if either {@code root} is already watched or {@code root} is not a directory.
+     * Does nothing if {@code root} is already watched.
      * Operation is thread-safe.
      *
      * @param root start watching to.
      */
-    public void startWatch(String root) {
+    public void startWatch(String root) throws NoSuchFileException  {
         startWatch(Paths.get(root));
     }
 
     /**
      * Start watching path specified {@code root}.
-     * Does nothing if either {@code root} is already watched or {@code root} is not a directory.
+     * Does nothing if {@code root} is already watched.
      * Operation is thread-safe.
      *
      * @param root start watching to.
      */
-    public void startWatch(Path root) {
+    public void startWatch(Path root) throws NoSuchFileException {
         log.info("Start watching {}", root);
         if (!Files.isDirectory(root)) {
-            log.warn("Can't start watch path {}: it isn't a directory.", root);
-            return;
+            throw new NoSuchFileException(root + " is not a directory.");
         }
         if (fsRegistrar.isRegistered(root)) {
             log.warn("Path {} is already registered.", root);
@@ -180,30 +184,23 @@ public class WordToPathIndex {
 
     /**
      * Stop watching path specified by {@code root}.
-     * Does nothing if either {@code root} is already unwatched or {@code root} is not a directory.
      * Operation is thread-safe.
      *
      * @param root stop watching to.
      */
-    public void stopWatch(String root) {
+    public void stopWatch(String root) throws NoSuchFileException {
         stopWatch(Paths.get(root));
     }
 
     /**
      * Stop watching path specified by {@code root}.
-     * Does nothing if either {@code root} is already unwatched or {@code root} is not a directory.
      * Operation is thread-safe.
      *
      * @param root stop watching to.
      */
-    public void stopWatch(Path root) {
-        if (!Files.isDirectory(root)) {
-            log.warn("Path {} is not a directory.", root);
-            return;
-        }
-        if (!fsRegistrar.isRegistered(root)) {
-            log.warn("Path {} isn't registered. Nothing to stop.", root);
-            return;
+    public void stopWatch(Path root) throws NoSuchFileException {
+        if (!fsRegistrar.isDirectory(root)) {
+            throw new NoSuchFileException("Directory " + root + " is not watched.");
         }
         log.info("Stop watching {}", root);
         List<Path> removed = fsRegistrar.unregisterAll(root);
@@ -282,6 +279,9 @@ public class WordToPathIndex {
         log.info("Index is stopped.");
     }
 
+    public IndexProperties getProperties() {
+        return this.properties;
+    }
 
     private boolean moveToPending(Path path) {
         if (!pendingInconsistentPaths.contains(path)) {
@@ -323,8 +323,10 @@ public class WordToPathIndex {
                 }
                 try {
                     index.update(file);
+                } catch (FileTooBigIndexException | FileHasZeroLengthException e) {
+                    log.warn(e.getMessage());
                 } catch (IndexException e) {
-                    log.error("Exception while indexing file {}: {}", file, e);
+                    log.error("Exception while indexing file {}: {}", file, e.getMessage());
                 }
             }
         };
@@ -341,7 +343,7 @@ public class WordToPathIndex {
                 try {
                     index.remove(file);
                 } catch (IndexException e) {
-                    log.error("Exception while removing file from index {}: {}", file, e);
+                    log.error("Exception while removing file from index {}: {}", file, e.getMessage());
                 }
             }
         };
@@ -467,16 +469,16 @@ public class WordToPathIndex {
         /**
          * Threads count used by {@link java.util.concurrent.ExecutorService executor} while executing updating tasks.
          */
-        public final static String INDEXING_THREADS_COUNT_PROPERTY = "simpleindexer.threads.count";
+        public final static String INDEXING_THREADS_COUNT_PROPERTY = "indexer.threads.count";
         /**
          * Whether request {@link simpleindexer.WordToPathIndex#getPathsByWord(String)} will blocking.
          */
-        public final static String BLOCK_REQUEST_PROPERTY = "simpleindexer.block.request";
+        public final static String BLOCK_REQUEST_PROPERTY = "indexer.block.request";
         /**
          * Maximum allowed for indexing file size in bytes.
          * @see simpleindexer.fs.FileWrapper
          */
-        public final static String MAX_AVAILABLE_FILE_SIZE_PROPERTY = "simpleindexer.max.file.size";
+        public final static String MAX_AVAILABLE_FILE_SIZE_PROPERTY = "indexer.max.file.size";
 
         private int indexingThreadsCountProperty;
         private boolean blockRequestProperty;
@@ -507,6 +509,15 @@ public class WordToPathIndex {
 
         public long getMaxAvailableFileSizeProperty() {
             return maxAvailableFileSizeProperty;
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(INDEXING_THREADS_COUNT_PROPERTY).append("=").append(indexingThreadsCountProperty).append("; ");
+            sb.append(BLOCK_REQUEST_PROPERTY).append("=").append(blockRequestProperty).append("; ");
+            sb.append(MAX_AVAILABLE_FILE_SIZE_PROPERTY).append("=").append(maxAvailableFileSizeProperty).append(";");
+            return sb.toString();
         }
     }
 }

@@ -78,7 +78,8 @@ public class FSRegistrar {
                     fs.get(root.getParent()).getChildren().add(root.getFileName());
             } else {
                 fs.put(root, new FSEntry(root));
-                fs.get(root.getParent()).getChildren().add(root.getFileName());
+                if (fs.containsKey(root.getParent()))
+                    fs.get(root.getParent()).getChildren().add(root.getFileName());
             }
 
         } finally {
@@ -87,23 +88,19 @@ public class FSRegistrar {
     }
 
     /**
-     * Unregister all paths stats with {@code prefix}.
+     * Unregister all paths starts with {@code prefix}.
      *
      * @param prefix of all paths should be unregistered
      * @return {@link java.util.List} of {@link java.nio.file.Path paths} that was unregistered.
      */
     public List<Path> unregisterAll(final Path prefix) {
         List<Path> removed = new ArrayList<>();
-        if (!isRegistered(prefix)) return removed;
-        if (fs.containsKey(prefix)) {
-            writeLock().lock();
-            try {
-                if (fs.containsKey(prefix)) {
-                    removed.addAll(unregisterAllHelper(prefix));
-                }
-            } finally {
-                writeLock().unlock();
-            }
+        writeLock().lock();
+        try {
+            if (fs.containsKey(prefix))
+                removed.addAll(unregisterAllHelper(prefix));
+        } finally {
+            writeLock().unlock();
         }
         return removed;
     }
@@ -118,6 +115,15 @@ public class FSRegistrar {
         try {
             readLock().lock();
             return fs.containsKey(path);
+        } finally {
+            readLock().unlock();
+        }
+    }
+
+    public boolean isDirectory(Path path) {
+        try {
+            readLock().lock();
+            return fs.containsKey(path) && fs.get(path).isDirectory();
         } finally {
             readLock().unlock();
         }

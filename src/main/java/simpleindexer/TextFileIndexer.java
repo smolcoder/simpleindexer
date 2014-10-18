@@ -1,6 +1,7 @@
 package simpleindexer;
 
 import gnu.trove.map.hash.THashMap;
+import simpleindexer.exceptions.IndexException;
 import simpleindexer.fs.FileWrapper;
 import simpleindexer.tokenizer.Token;
 import simpleindexer.tokenizer.Tokenizer;

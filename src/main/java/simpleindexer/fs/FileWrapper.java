@@ -1,5 +1,8 @@
 package simpleindexer.fs;
 
+import simpleindexer.exceptions.FileHasZeroLengthException;
+import simpleindexer.exceptions.FileTooBigIndexException;
+
 import java.io.*;
 import java.nio.charset.Charset;
 import java.nio.file.Path;
@@ -30,30 +33,30 @@ public class FileWrapper {
         return Paths.get(file.getPath());
     }
 
-    public String getContent() throws IOException {
+    public String getContent() throws IOException, FileTooBigIndexException, FileHasZeroLengthException {
         return getContent(Charset.defaultCharset());
     }
 
-    public String getContent(Charset charset) throws IOException {
+    public String getContent(Charset charset) throws IOException, FileTooBigIndexException, FileHasZeroLengthException {
         if (asString == null)
             asString = new String(getBytes(), charset);
         return asString;
     }
 
-    public byte[] getBytes() throws IOException {
+    public byte[] getBytes() throws IOException, FileTooBigIndexException, FileHasZeroLengthException {
         if (asBytes == null)
             read();
         return asBytes;
     }
 
-    private void read() throws IOException {
+    private void read() throws IOException, FileTooBigIndexException, FileHasZeroLengthException {
         try (InputStream stream = new BufferedInputStream(new FileInputStream(file))) {
             final long length = file.length();
-            if (length <= 0) {
-                throw new IOException("Length of " + file + " <= 0.");
+            if (length == 0) {
+                throw new FileHasZeroLengthException(file.toString());
             }
             if (length > maxFileSizeInBytes) {
-                throw new IOException("File " + file + " is too long: " + length + " > " + maxFileSizeInBytes);
+                throw new FileTooBigIndexException(file.toString(), length, maxFileSizeInBytes);
             }
             asBytes = org.apache.commons.io.IOUtils.toByteArray(stream, length);
         }

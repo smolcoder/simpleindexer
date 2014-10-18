@@ -1,6 +1,7 @@
 package simpleindexer;
 
 import gnu.trove.map.hash.THashMap;
+import simpleindexer.exceptions.IndexException;
 import simpleindexer.valuestorages.SetValueStorage;
 import simpleindexer.valuestorages.ValueStorage;
 import org.jetbrains.annotations.Nullable;

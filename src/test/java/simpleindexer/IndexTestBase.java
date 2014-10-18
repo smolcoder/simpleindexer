@@ -2,6 +2,7 @@ package simpleindexer;
 
 import junit.framework.Assert;
 import org.apache.commons.io.FileUtils;
+import simpleindexer.exceptions.IndexException;
 
 import java.io.*;
 import java.nio.file.*;
@@ -48,7 +49,7 @@ public class IndexTestBase {
     private void matchTestDirHelper(boolean strict, String query, String testDirPath, String... suffixes) throws InterruptedException, IndexException {
         List<String> list = index.getPathsByWord(query);
         if (strict)
-            matchCount(query, suffixes.length);
+            matchCount(query, list, suffixes.length);
         for (String s : suffixes) {
             Assert.assertTrue("List " + list + " doesn't contain path " + Paths.get(testDirPath, s),
                     list.contains(Paths.get(testDirPath, s).toString()));
@@ -56,8 +57,11 @@ public class IndexTestBase {
     }
 
     protected void matchCount(String query, int count) throws InterruptedException, IndexException {
-        List<String> list = index.getPathsByWord(query);
-        Assert.assertEquals("Diff sizes on query '" + query + "'", count, list.size());
+        matchCount(query, index.getPathsByWord(query), count);
+    }
+
+    protected void matchCount(String query, List<String> paths, int count) throws InterruptedException, IndexException {
+        Assert.assertEquals("Diff sizes on query '" + query + "'", count, paths.size());
     }
 
     protected void appendToFile(String filePath, String text) {

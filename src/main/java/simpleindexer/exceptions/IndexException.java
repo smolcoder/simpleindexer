@@ -1,4 +1,4 @@
-package simpleindexer;
+package simpleindexer.exceptions;
 
 /**
  * @author Ivan Arbuzov
