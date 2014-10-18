@@ -18,9 +18,9 @@ Simple implementation of concurrent [inverted indexer](http://en.wikipedia.org/w
     * `git clone https://github.com/smolcoder/simpleindexer.git`
     * `cd simpleindexer`
     *  `mvn clean package`
-    * in **build** directory will appear **simpleindexer.jar**
+    * in **build** directory will appear executable **simpleindexer.jar**
 
-### Example ###
+### API example ###
 Create index instance:
 ```java
 WordToPathIndex index = new WordToPathIndex(FileSystems.getDefault());
@@ -44,4 +44,13 @@ index.stopWatch(Paths.get(pathToIndexerSrc, "src/main/java/simpleindexer/fs"));
 Shutdown index:
 ```java
 index.shutdown();
+```
+### Comand-line usage exapmle ####
+Run indexer (from relative to simpleindexer/):
+```bash
+java -jar simpleindexer.jar
+```
+Run indexer (from relative to simpleindexer/):
+```bash
+java -jar simpleindexer.jar
 ```
