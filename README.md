@@ -81,6 +81,9 @@ Stop indexer and exit:
 ```
 
 Note: do not add src/ path to indexer when logging is switched-on.
+
 Note: do not remove/rename root watched by indexer (i.e. such path which parent is not watched by indexer).
+
 Note: use -Dindexer.ignore.list.file property to avoid indexing binary data. By default *nothing* is ignored.
+
 Note: use -Dindexer.block.request=false property to avoid blocking *find* request when indexing is processed.
