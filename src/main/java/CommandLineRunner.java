@@ -45,7 +45,7 @@ public class CommandLineRunner {
             System.err.println("Exit.");
             return;
         }
-        String cmd = null;
+        String cmd;
         BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
         while(true) {
             System.out.print(PROMPT);
@@ -62,9 +62,10 @@ public class CommandLineRunner {
                 if (cmd.isEmpty()) continue;
                 if (cmd.startsWith("q"))
                 {
+                    System.out.println("Shutdown indexer. Wait, please...");
                     index.shutdown();
-                    System.out.println("Quit.");
-                    return;
+                    System.out.println("Done. Exit.");
+                    System.exit(0);
                 } else if (cmd.startsWith("h"))
                 {
                     System.out.println(USAGE);
@@ -74,6 +75,7 @@ public class CommandLineRunner {
                     if (arg.length != 2) {
                         System.out.println(USAGE);
                     } else {
+                        System.out.println("Adding " + arg[1] + " ...");
                         index.startWatch(getPath(forRelativePaths, arg[1]));
                     }
                 } else if (cmd.startsWith("rm") || cmd.startsWith("remove"))
@@ -95,11 +97,11 @@ public class CommandLineRunner {
                         }
                     }
                 } else {
-                    System.out.println("Unknown command: " + cmd);
+                    System.out.println("ERROR: Unknown command: " + cmd);
                     System.out.println(USAGE);
                 }
             } catch (IndexException | NoSuchFileException e) {
-                System.out.println(e.getMessage());
+                System.out.println("ERROR: " + e.getMessage());
             } catch (InterruptedException e) {
                 System.out.println("Process was interrupted. Exit.");
                 return;

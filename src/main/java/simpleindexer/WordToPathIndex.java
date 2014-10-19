@@ -11,6 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
 import java.io.IOException;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -69,6 +70,7 @@ public class WordToPathIndex {
     private ExecutorService executor;
     private Index<String, String, FileWrapper> index;
     private volatile boolean isTerminated;
+    private final PathFilter pathFilter;
 
     /**
      * Creates index by specified file system, {@link simpleindexer.WordToPathIndex.IndexProperties properties} and
@@ -84,8 +86,11 @@ public class WordToPathIndex {
         this.watchService = checkNotNull(fileSystem, "fileSystem").newWatchService();
         this.properties = checkNotNull(properties, "properties");
         log.info("Properties: {}", properties);
+        File ignore = new File(this.properties.getIgnoreListProperty());
         int nThreads = properties.getIndexingThreadsCountProperty();
         executor = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, executorQueue);
+        pathFilter = ignore.isFile() ? new PathFilter(ignore) : new PathFilter();
+        log.info("Use {}", pathFilter);
         FSEventDispatcher<FSEventListener> fsEventDispatcher = new FSEventDispatcher<>();
         fsWatcher = new FSWatcher(watchService, fsEventDispatcher);
         fsRegistrar = new FSRegistrar(new FSRegistrar.Registrar() {
@@ -171,10 +176,10 @@ public class WordToPathIndex {
      * @param root start watching to.
      */
     public void startWatch(Path root) throws NoSuchFileException {
-        log.info("Start watching {}", root);
         if (!Files.isDirectory(root)) {
             throw new NoSuchFileException(root + " is not a directory.");
         }
+        log.info("Start watching {}", root);
         if (fsRegistrar.isRegistered(root)) {
             log.warn("Path {} is already registered.", root);
             return;
@@ -356,7 +361,7 @@ public class WordToPathIndex {
         if (!moveToPending(path)) {
             return;
         }
-        log.debug("Submit to update {}.", path);
+        log.debug("submit to update {}.", path);
         try {
             executor.submit(updateTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
@@ -368,10 +373,10 @@ public class WordToPathIndex {
     private void submitRemoveTask(Path path) {
         checkIsRunning();
         if (!moveToPending(path)) {
-            log.warn("File already scheduled: {}", path);
+            log.warn("file already scheduled: {}", path);
             return;
         }
-        log.debug("Submit remove {}", path);
+        log.debug("submit remove {}", path);
         try {
             executor.submit(removeTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
@@ -380,31 +385,39 @@ public class WordToPathIndex {
         }
     }
 
-    private void submitUpdateTaskRecursive(final Path path) {
+    private void submitUpdateTaskRecursive(final Path dirPath) {
         checkIsRunning();
         try {
-            if (!Files.isDirectory(path)) {
-                log.debug("Path {} is not a dir. Skip its recursive update.", path);
+            if (!Files.isDirectory(dirPath)) {
+                log.debug("path {} is not a dir. Skip its recursive update.", dirPath);
                 return;
             }
-            Files.walkFileTree(path, new SimpleFileVisitor<Path>() {
+            Files.walkFileTree(dirPath, new SimpleFileVisitor<Path>() {
                 @Override
-                public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
-                    log.debug("Visit file {}", filePath);
-                    fsRegistrar.register(filePath);
-                    submitUpdateTask(filePath);
+                public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
+                    if (!pathFilter.accept(path)) {
+                        log.warn("ignore {}", path);
+                    } else {
+                        log.debug("visit file {}", path);
+                        fsRegistrar.register(path);
+                        submitUpdateTask(path);
+                    }
                     return FileVisitResult.CONTINUE;
                 }
 
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                    log.debug("Visit dir {}", dir);
+                    if (!pathFilter.accept(dirPath)) {
+                        log.warn("ignore {}", dirPath);
+                        return FileVisitResult.SKIP_SUBTREE;
+                    }
+                    log.debug("visit dir {}", dir);
                     fsRegistrar.register(dir);
                     return FileVisitResult.CONTINUE;
                 }
             });
         } catch (IOException e) {
-            log.error("Error while recursive updating {}: {}", path, e);
+            log.error("Error while recursive updating {}: {}", dirPath, e);
         }
     }
 
@@ -423,6 +436,10 @@ public class WordToPathIndex {
         @Override
         public void onFileCreated(final Path path) throws IOException {
             checkIsRunning();
+            if (!pathFilter.accept(path)) {
+                log.warn("ignore {}", path);
+                return;
+            }
             fsRegistrar.register(path);
             submitUpdateTask(path);
         }
@@ -430,6 +447,10 @@ public class WordToPathIndex {
         @Override
         public void onFileModified(final Path path) throws IOException {
             checkIsRunning();
+            if (!pathFilter.accept(path)) {
+                log.warn("ignore {}", path);
+                return;
+            }
             fsRegistrar.register(path);
             submitUpdateTask(path);
         }
@@ -473,7 +494,8 @@ public class WordToPathIndex {
          */
         public final static String INDEXING_THREADS_COUNT_PROPERTY = "indexer.threads.count";
         /**
-         * Whether request {@link simpleindexer.WordToPathIndex#getPathsByWord(String)} will blocking.
+         * Whether request {@link simpleindexer.WordToPathIndex#getPathsByWord(String)} will be blocked if indexer is
+         * in progress at the time of request.
          */
         public final static String BLOCK_REQUEST_PROPERTY = "indexer.block.request";
         /**
@@ -481,10 +503,17 @@ public class WordToPathIndex {
          * @see simpleindexer.fs.FileWrapper
          */
         public final static String MAX_AVAILABLE_FILE_SIZE_PROPERTY = "indexer.max.file.size";
+        /**
+         * Path to file where each line contains regexp describes path should be ignored by indexer.
+         * E.g.:
+         * .*\.zip -- ignore all files with .zip extension.
+         */
+        public final static String IGNORE_LIST_PROPERTY = "indexer.ignore.list.file";
 
         private int indexingThreadsCountProperty;
         private boolean blockRequestProperty;
         private long maxAvailableFileSizeProperty;
+        private String ignoreListFilePath;
 
         public IndexProperties(@NotNull Properties properties) {
             checkNotNull(properties, "properties");
@@ -495,6 +524,8 @@ public class WordToPathIndex {
                     BLOCK_REQUEST_PROPERTY, "true"));
             this.maxAvailableFileSizeProperty = Long.parseLong(properties.getProperty(
                     MAX_AVAILABLE_FILE_SIZE_PROPERTY, String.valueOf(30 * 1024 * 1024L)));
+            this.ignoreListFilePath = properties.getProperty(
+                    IGNORE_LIST_PROPERTY, "");
         }
 
         public IndexProperties() {
@@ -513,11 +544,16 @@ public class WordToPathIndex {
             return maxAvailableFileSizeProperty;
         }
 
+        public String getIgnoreListProperty() {
+            return ignoreListFilePath;
+        }
+
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append(INDEXING_THREADS_COUNT_PROPERTY).append("=").append(indexingThreadsCountProperty).append("; ");
             sb.append(BLOCK_REQUEST_PROPERTY).append("=").append(blockRequestProperty).append("; ");
+            sb.append(IGNORE_LIST_PROPERTY).append("=").append(ignoreListFilePath).append("; ");
             sb.append(MAX_AVAILABLE_FILE_SIZE_PROPERTY).append("=").append(maxAvailableFileSizeProperty).append(";");
             return sb.toString();
         }

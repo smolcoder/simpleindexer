@@ -3,6 +3,7 @@ package simpleindexer.fs;
 import org.jetbrains.annotations.NotNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import simpleindexer.PathFilter;
 
 import java.io.IOException;
 import java.nio.file.*;
@@ -30,9 +31,9 @@ public class FSEventDispatcher<E extends FSEventListener> {
      * @throws IOException
      */
     public void dispatch(FSEvent event) throws IOException {
+        Path eventRoot = event.getFullPath();
+        log.debug(event.toString());
         for (E l : listeners) {
-            Path eventRoot = event.getFullPath();
-            log.debug(event.toString());
             if (event.isDelete()) {
                 l.onDeleted(eventRoot);
             } else {
