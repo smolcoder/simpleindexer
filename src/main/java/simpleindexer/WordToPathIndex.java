@@ -323,6 +323,7 @@ public class WordToPathIndex {
                 }
                 try {
                     index.update(file);
+                    log.debug("updated {}", file);
                 } catch (FileTooBigIndexException | FileHasZeroLengthException e) {
                     log.warn(e.getMessage());
                 } catch (IndexException e) {
@@ -342,6 +343,7 @@ public class WordToPathIndex {
                 }
                 try {
                     index.remove(file);
+                    log.debug("removed {}", file);
                 } catch (IndexException e) {
                     log.error("Exception while removing file from index {}: {}", file, e.getMessage());
                 }

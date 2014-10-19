@@ -87,8 +87,8 @@ public class IndexTestBase {
         for (int i = 0; i < lines; ++i) {
             sb.append("AAA BBB CCC DDD EEE\n");
         }
-        try(BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(Paths.get(path, other).toFile()))) {
-            out.write(sb.toString().getBytes());
+        try(FileWriter out = new FileWriter(Paths.get(path, other).toFile())) {
+            out.write(sb.toString());
         }
     }
 

@@ -379,7 +379,7 @@ public class FunctionalTest extends IndexTestBase {
         generateBigFile(2 * 1024 * 1024, testDirPath, "big2"); // too big
         generateBigFile(1 * 1024 * 1024, testDirPath, "big3"); // ok
         generateBigFile(512 * 1024, testDirPath, "big4");      // ok
-        Thread.sleep(6000);
+        Thread.sleep(3000);
         matchAll("AAA", "big3", "big4");
         matchAll("BBB", "big3", "big4");
         matchAll("CCC", "big3", "big4");
