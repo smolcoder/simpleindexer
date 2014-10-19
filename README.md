@@ -76,4 +76,4 @@ List all files than contain word "example":
 >> find example
 ```
 
-Note: do not add src/ path to indexer when loggin is switched-on.
+Note: do not add src/ path to indexer when logging is switched-on.
