@@ -50,9 +50,9 @@ Run indexer (from relative to simpleindexer/):
 ```bash
 java -jar build/simpleindexer.jar
 ```
-Run indexer with indexer options:
+Run indexer with indexer options (threads count and index ignore file):
 ```bash
-java -jar -Dindexer.threads.count=2 build/simpleindexer.jar
+java -jar -Dindexer.threads.count=2 -Dindexer.ignore.list.file=.indexignore build/simpleindexer.jar
 ```
 Interactive prompt will appear as indexer started.
 
@@ -75,5 +75,12 @@ List all files than contain word "example":
 ```bash
 >> find example
 ```
+Stop indexer and exit:
+```bash
+>> q
+```
 
 Note: do not add src/ path to indexer when logging is switched-on.
+Note: do not remove/rename root watched by indexer (i.e. such path which parent is not watched by indexer).
+Note: use -Dindexer.ignore.list.file property to avoid indexing binary data. By default *nothing* is ignored.
+Note: use -Dindexer.block.request=false property to avoid blocking *find* request when indexing is processed.
