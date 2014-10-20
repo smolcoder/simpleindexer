@@ -61,17 +61,17 @@ Print help:
 >> h
 ```
 
-Add directory:
+Start watch directory:
 ```bash
 >> add ../somePathRelativeToSimpleindexer
 ```
 
-Remove directory:
+Stop watch directory:
 ```bash
 >> rm ../somePathRelativeToSimpleindexer
 ```
 
-List all files than contain word "example":
+List all files that contain word "example":
 ```bash
 >> find example
 ```
