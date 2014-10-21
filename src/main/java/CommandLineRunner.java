@@ -27,7 +27,7 @@ public class CommandLineRunner {
 
     public static final String PROMPT = ">> ";
 
-    public static final String[] COMMANDS = {"h", "q", "find", "add", "rm", "remove"};
+    public static final String[] COMMANDS = {"h", "q", "find", "add", "rm", "remove", "count"};
 
     private static Path getPath(String root, String mayBeRelative) {
         if (Paths.get(mayBeRelative).isAbsolute()) {
@@ -89,7 +89,17 @@ public class CommandLineRunner {
                     } else {
                         index.stopWatch(getPath(forRelativePaths, arg[1]));
                     }
-                } else if (cmd.startsWith("find")) {
+                } else if (cmd.startsWith("count"))
+                {
+                    String[] arg = cmd.split(" ");
+                    if (arg.length != 2) {
+                        console.println(USAGE);
+                    } else {
+                        List<String> paths = index.getPathsByWord(arg[1]);
+                        console.println(Integer.toString(paths.size()));
+                    }
+                } else if (cmd.startsWith("find"))
+                {
                     String[] arg = cmd.split(" ");
                     if (arg.length != 2) {
                         console.println(USAGE);

@@ -16,6 +16,11 @@ import java.nio.file.Paths;
  */
 public class FileWrapper {
 
+    // stub
+    private final static String[] IS_BINARY_MARKERS =
+            {".tar", ".zip", ".rar", ".jar", ".war", ".class", ".7z", ".exe", ".png", ".jpg", ".jpeg", ".gif",
+             ".mp3", ".mp4", ".wav", ".avi", ".mov", ".lib", ".dll", ".so", ".iso", ".dylib", ".pdf", ".ps",
+             ".rtf", ".doc", ".docx", ".xls", ".xlsx"};
     private final File file;
 
     private byte[] asBytes;
@@ -24,9 +29,15 @@ public class FileWrapper {
 
     private final long maxFileSizeInBytes;
 
+    private final static long MAX_FILE_SIZE_IN_BYTES_DEFAULT = 30 * 1024 * 1024L;
+
     public FileWrapper(Path path, long maxFileSizeInBytes) {
         this.file = path.toFile();
         this.maxFileSizeInBytes = maxFileSizeInBytes;
+    }
+
+    public FileWrapper(Path path) {
+        this(path, MAX_FILE_SIZE_IN_BYTES_DEFAULT);
     }
 
     public Path getPath() {
@@ -61,6 +72,14 @@ public class FileWrapper {
             asBytes = org.apache.commons.io.IOUtils.toByteArray(stream, length);
         }
     }
+
+    public boolean isBinary() {
+        for (String ext : IS_BINARY_MARKERS)
+            if (getPath().toString().toLowerCase().endsWith(ext))
+                return true;
+        return false;
+    }
+
     @Override
     public String toString() {
         return getPath().toString();

@@ -2,9 +2,11 @@ package simpleindexer;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import simpleindexer.fs.FileWrapper;
 
 import java.io.*;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -44,7 +46,11 @@ public class PathFilter {
                 return false;
             }
         }
-        return true;
+        return defaultAccept(path);
+    }
+
+    public boolean defaultAccept(String path) {
+        return !(new FileWrapper(Paths.get(path)).isBinary());
     }
 
     public String toString() {

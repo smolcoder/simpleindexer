@@ -396,9 +396,8 @@ public class WordToPathIndex {
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
                     if (!pathFilter.accept(path)) {
-                        log.debug("ignore {}", path);
+                        log.trace("ignore {}", path);
                     } else {
-                        log.debug("visit file {}", path);
                         fsRegistrar.register(path);
                         submitUpdateTask(path);
                     }
@@ -408,10 +407,9 @@ public class WordToPathIndex {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
                     if (!pathFilter.accept(dirPath)) {
-                        log.debug("ignore {}", dirPath);
+                        log.trace("ignore {}", dirPath);
                         return FileVisitResult.SKIP_SUBTREE;
                     }
-                    log.debug("visit dir {}", dir);
                     fsRegistrar.register(dir);
                     return FileVisitResult.CONTINUE;
                 }
@@ -437,7 +435,7 @@ public class WordToPathIndex {
         public void onFileCreated(final Path path) throws IOException {
             checkIsRunning();
             if (!pathFilter.accept(path)) {
-                log.warn("ignore {}", path);
+                log.trace("ignore {}", path);
                 return;
             }
             fsRegistrar.register(path);
@@ -448,7 +446,7 @@ public class WordToPathIndex {
         public void onFileModified(final Path path) throws IOException {
             checkIsRunning();
             if (!pathFilter.accept(path)) {
-                log.warn("ignore {}", path);
+                log.trace("ignore {}", path);
                 return;
             }
             fsRegistrar.register(path);
@@ -519,9 +517,9 @@ public class WordToPathIndex {
             checkNotNull(properties, "properties");
             this.indexingThreadsCountProperty = Integer.parseInt(properties.getProperty(
                     INDEXING_THREADS_COUNT_PROPERTY,
-                    String.valueOf(2 * Runtime.getRuntime().availableProcessors())));
+                    String.valueOf(3 * Runtime.getRuntime().availableProcessors())));
             this.blockRequestProperty = Boolean.parseBoolean(properties.getProperty(
-                    BLOCK_REQUEST_PROPERTY, "true"));
+                    BLOCK_REQUEST_PROPERTY, "false"));
             this.maxAvailableFileSizeProperty = Long.parseLong(properties.getProperty(
                     MAX_AVAILABLE_FILE_SIZE_PROPERTY, String.valueOf(30 * 1024 * 1024L)));
             this.ignoreListFilePath = properties.getProperty(
