@@ -1,3 +1,7 @@
+import jline.console.ConsoleReader;
+import jline.console.completer.ArgumentCompleter;
+import jline.console.completer.FileNameCompleter;
+import jline.console.completer.StringsCompleter;
 import simpleindexer.exceptions.IndexException;
 import simpleindexer.WordToPathIndex;
 
@@ -23,6 +27,8 @@ public class CommandLineRunner {
 
     public static final String PROMPT = ">> ";
 
+    public static final String[] COMMANDS = {"h", "q", "find", "add", "rm", "remove"};
+
     private static Path getPath(String root, String mayBeRelative) {
         if (Paths.get(mayBeRelative).isAbsolute()) {
             return Paths.get(mayBeRelative);
@@ -30,8 +36,8 @@ public class CommandLineRunner {
         return Paths.get(root, mayBeRelative).normalize();
     }
 
-    public static void main(String[] args) {
-        WordToPathIndex index = null;
+    public static void main(String[] args) throws IOException {
+        WordToPathIndex index;
         String forRelativePaths = System.getProperty("user.dir");
         try {
             System.out.println("Initialize index...");
@@ -41,69 +47,66 @@ public class CommandLineRunner {
             System.out.println(USAGE);
             System.out.println("You're in " + forRelativePaths);
         } catch (IOException e) {
-            System.err.println("Can't start index: " + e);
-            System.err.println("Exit.");
+            System.out.println("Can't start index: " + e);
+            System.out.println("Exit.");
             return;
         }
+        ConsoleReader console = new ConsoleReader();
+        console.setPrompt(PROMPT);
+        ArgumentCompleter argumentCompleter = new ArgumentCompleter(
+                new ArgumentCompleter.WhitespaceArgumentDelimiter(),
+                new StringsCompleter(COMMANDS),
+                new FileNameCompleter());
+        console.addCompleter(argumentCompleter);
         String cmd;
-        BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-        while(true) {
-            System.out.print(PROMPT);
+        while((cmd = console.readLine()) != null) {
             try {
-                cmd = reader.readLine();
-            } catch (IOException e) {
-                System.err.println("Error while reading line: " + e);
-                continue;
-            }
-            try {
-                if (cmd == null) {
-                    return;
-                }
                 if (cmd.isEmpty()) continue;
                 if (cmd.startsWith("q"))
                 {
-                    System.out.println("Shutdown indexer. Wait, please...");
+                    console.println("Shutdown indexer. Wait, please...");
                     index.shutdown();
-                    System.out.println("Done. Exit.");
+                    console.println("Done. Exit.");
+                    console.flush();
                     System.exit(0);
                 } else if (cmd.startsWith("h"))
                 {
-                    System.out.println(USAGE);
+                    console.println(USAGE);
                 } else if (cmd.startsWith("add"))
                 {
                     String[] arg = cmd.split(" ");
                     if (arg.length != 2) {
-                        System.out.println(USAGE);
+                        console.println(USAGE);
                     } else {
-                        System.out.println("Adding " + arg[1] + " ...");
+                        console.println("Adding " + arg[1] + " ...");
                         index.startWatch(getPath(forRelativePaths, arg[1]));
                     }
                 } else if (cmd.startsWith("rm") || cmd.startsWith("remove"))
                 {
                     String[] arg = cmd.split(" ");
                     if (arg.length != 2) {
-                        System.out.println(USAGE);
+                        console.println(USAGE);
                     } else {
                         index.stopWatch(getPath(forRelativePaths, arg[1]));
                     }
                 } else if (cmd.startsWith("find")) {
                     String[] arg = cmd.split(" ");
                     if (arg.length != 2) {
-                        System.out.println(USAGE);
+                        console.println(USAGE);
                     } else {
                         List<String> paths = index.getPathsByWord(arg[1]);
                         for (String p : paths) {
-                            System.out.println(p);
+                            console.println(p);
                         }
                     }
                 } else {
-                    System.out.println("ERROR: Unknown command: " + cmd);
-                    System.out.println(USAGE);
+                    console.println("ERROR: Unknown command: " + cmd);
+                    console.println(USAGE);
                 }
             } catch (IndexException | NoSuchFileException e) {
-                System.out.println("ERROR: " + e.getMessage());
+                console.println("ERROR: " + e.getMessage());
             } catch (InterruptedException e) {
-                System.out.println("Process was interrupted. Exit.");
+                console.println("Process was interrupted. Exit.");
                 return;
             }
         }

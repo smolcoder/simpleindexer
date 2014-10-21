@@ -328,7 +328,7 @@ public class WordToPathIndex {
                 }
                 try {
                     index.update(file);
-                    log.debug("updated {}", file);
+                    log.info("updated {}", file);
                 } catch (FileTooBigIndexException | FileHasZeroLengthException e) {
                     log.warn(e.getMessage());
                 } catch (IndexException e) {
@@ -348,7 +348,7 @@ public class WordToPathIndex {
                 }
                 try {
                     index.remove(file);
-                    log.debug("removed {}", file);
+                    log.info("removed {}", file);
                 } catch (IndexException e) {
                     log.error("Exception while removing file from index {}: {}", file, e.getMessage());
                 }
@@ -361,7 +361,7 @@ public class WordToPathIndex {
         if (!moveToPending(path)) {
             return;
         }
-        log.debug("submit to update {}.", path);
+        log.info("submit to update {}.", path);
         try {
             executor.submit(updateTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
@@ -396,7 +396,7 @@ public class WordToPathIndex {
                 @Override
                 public FileVisitResult visitFile(Path path, BasicFileAttributes attrs) throws IOException {
                     if (!pathFilter.accept(path)) {
-                        log.warn("ignore {}", path);
+                        log.debug("ignore {}", path);
                     } else {
                         log.debug("visit file {}", path);
                         fsRegistrar.register(path);
@@ -408,7 +408,7 @@ public class WordToPathIndex {
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
                     if (!pathFilter.accept(dirPath)) {
-                        log.warn("ignore {}", dirPath);
+                        log.debug("ignore {}", dirPath);
                         return FileVisitResult.SKIP_SUBTREE;
                     }
                     log.debug("visit dir {}", dir);
