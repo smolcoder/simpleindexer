@@ -194,12 +194,9 @@ public class FunctionalTest extends IndexTestBase {
 
     @Test
     public void moveDirectoryTest() throws InterruptedException, IOException, IndexException {
-        Files.move(Paths.get(testDirPath, "bar1/bar2/bar3/bar4"), Paths.get(testDirPath, "mbar4middle"));
-        Thread.sleep(500);
-        Files.move(Paths.get(testDirPath, "mbar4middle"), Paths.get(testDirPath, "mbar4"));
-        Thread.sleep(500);
+        Files.move(Paths.get(testDirPath, "bar1/bar2/bar3/bar4"), Paths.get(testDirPath, "mbar4"));
         Files.move(Paths.get(testDirPath, "foo1/bar2"), Paths.get(testDirPath, "foo1/mbar2"));
-        Thread.sleep(sleepTimeBeforeMatching);
+        Thread.sleep(2 * sleepTimeBeforeMatching);
         matchAll("Hello", "foo1/foo2/foo3/file1", "bar1/bar2/foo3/file1", "foo1/foo2/file1", "mbar4/file1");
         matchAll("aa", "bar1/bar2/foo3/bar4/file1", "bar1/file1", "foo1/mbar2/file1", "foo1/file1");
         matchAll("bbb", "mbar4/file1", "bar1/bar2/file1", "foo1/file2", "/foo1/foo2/file1");
@@ -385,7 +382,7 @@ public class FunctionalTest extends IndexTestBase {
         fakeAppendToFile(testDirPath, "big1");
         Thread.sleep(500);
         fakeAppendToFile(testDirPath, "big2");
-        Thread.sleep(3000);
+        Thread.sleep(2 * sleepTimeBeforeMatching);
         matchAll("AAA", "big3", "big4");
         matchAll("BBB", "big3", "big4");
         matchAll("CCC", "big3", "big4");
