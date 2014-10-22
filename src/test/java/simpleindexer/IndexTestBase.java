@@ -87,8 +87,14 @@ public class IndexTestBase {
         for (int i = 0; i < lines; ++i) {
             sb.append("AAA BBB CCC DDD EEE\n");
         }
-        try(FileWriter out = new FileWriter(Paths.get(path, other).toFile())) {
-            out.write(sb.toString());
+        try(BufferedOutputStream out = new BufferedOutputStream(new FileOutputStream(Paths.get(path, other).toFile()))) {
+            out.write(sb.toString().getBytes());
+        }
+    }
+
+    protected void fakeAppendToFile(String path, String ... other) throws IOException {
+        try (PrintWriter out = new PrintWriter(new BufferedWriter(new FileWriter(Paths.get(path, other).toString())))) {
+            out.print("");
         }
     }
 
