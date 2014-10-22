@@ -61,7 +61,7 @@ public class IndexTestBase {
     }
 
     protected void matchCount(String query, List<String> paths, int count) throws InterruptedException, IndexException {
-        Assert.assertEquals("Diff sizes on query '" + query + "'", count, paths.size());
+        Assert.assertEquals("Diff sizes on query '" + query + "': " + paths + ": ", count, paths.size());
     }
 
     protected void appendToFile(String filePath, String text) {

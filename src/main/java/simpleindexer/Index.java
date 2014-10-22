@@ -21,7 +21,8 @@ public interface Index<K, V, D> {
      * {@code null} otherwise.
      *
      * @param key key to search in index
-     * @return {@link simpleindexer.valuestorages.ValueStorage} if there is data fot specified {@code key} or {@code null}
+     * @return {@link simpleindexer.valuestorages.ValueStorage} if there is data fot specified {@code key}
+     *          or {@code null} otherwise
      * @throws simpleindexer.exceptions.IndexException
      */
     @Nullable

@@ -40,6 +40,11 @@ public class SetValueStorage<E> implements ValueStorage<E> {
         return copy;
     }
 
+    @Override
+    public boolean isEmpty() {
+        return set.isEmpty();
+    }
+
 
     public String toString() {
         return set.toString();

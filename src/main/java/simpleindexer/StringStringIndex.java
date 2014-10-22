@@ -60,18 +60,17 @@ public class StringStringIndex implements Index<String, String, FileWrapper> {
 
     @Override
     public void update(FileWrapper file) throws IndexException {
+        remove(file);
+        if (!Files.isRegularFile(file.getPath())) {
+            return;
+        }
+        Map<String, Void> newData = dataIndexer.index(file);
         lock.writeLock().lock();
         try {
-            String path = file.getPath().toString();
-            removeHelper(path);
-            if (!Files.isRegularFile(file.getPath())) {
-                return;
-            }
-            Map<String, Void> newData = dataIndexer.index(file);
-            for (String k : newData.keySet()) {
-                indexStorage.add(k, path);
-            }
             fileToKeys.put(file.getPath().toString(), newData.keySet());
+            for (String k : newData.keySet()) {
+                indexStorage.add(k, file.toString());
+            }
         } finally {
             lock.writeLock().unlock();
         }
@@ -82,19 +81,17 @@ public class StringStringIndex implements Index<String, String, FileWrapper> {
         lock.writeLock().lock();
         try {
             log.debug("remove from index {}", file);
-            removeHelper(file.getPath().toString());
+            String path = file.toString();
+            Set<String> oldKeys = fileToKeys.remove(path);
+            if (oldKeys != null && !oldKeys.isEmpty()) {
+                log.debug("remove old keys from {}", path);
+                for (String k : oldKeys) {
+                    indexStorage.remove(k, path);
+                }
+            }
         } finally {
             lock.writeLock().unlock();
         }
     }
 
-    private void removeHelper(String path) throws IndexException {
-        Set<String> oldKeys = fileToKeys.get(path);
-        if (oldKeys != null && !oldKeys.isEmpty()) {
-            log.debug("remove old keys from {}", path);
-            for (String k : oldKeys) {
-                indexStorage.remove(k, path);
-            }
-        }
-    }
 }

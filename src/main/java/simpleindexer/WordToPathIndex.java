@@ -1,6 +1,7 @@
 package simpleindexer;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
+import gnu.trove.set.hash.THashSet;
 import simpleindexer.exceptions.FileHasZeroLengthException;
 import simpleindexer.exceptions.FileTooBigIndexException;
 import simpleindexer.exceptions.IndexException;
@@ -61,7 +62,7 @@ public class WordToPathIndex {
 
     private final WatchEvent.Kind[] EVENTS = new WatchEvent.Kind[]{ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY};
     private final WatchService watchService;
-    private final Set<Path> pendingInconsistentPaths = new ConcurrentSkipListSet<>();
+    private final Set<Path> pendingInconsistentPaths = new THashSet<>();
     private final ReentrantReadWriteLock pendingLock = new ReentrantReadWriteLock();
     private final LinkedBlockingQueue<Runnable> executorQueue = new LinkedBlockingQueue<>();
     private final IndexProperties properties;
@@ -102,7 +103,7 @@ public class WordToPathIndex {
             }
         });
         fsEventDispatcher.addListener(new Submitter());
-        index = new StringStringIndex(new TextFileIndexer(), new IndexStorageImpl());
+        index = new StringStringMemoIndex(new TextFileIndexer());
         fsWatcher.start();
         if (path != null)
             submitUpdateTaskRecursive(path);
@@ -288,34 +289,31 @@ public class WordToPathIndex {
         return this.properties;
     }
 
+    // TODO make double-checked locking
     private boolean moveToPending(Path path) {
-        if (!pendingInconsistentPaths.contains(path)) {
-            pendingLock.writeLock().lock();
-            try {
-                if (!pendingInconsistentPaths.contains(path)) {
-                    pendingInconsistentPaths.add(path);
-                    return true;
-                }
-            } finally {
-                pendingLock.writeLock().unlock();
+        pendingLock.writeLock().lock();
+        try {
+            if (!pendingInconsistentPaths.contains(path)) {
+                pendingInconsistentPaths.add(path);
+                return true;
             }
+            return false;
+        } finally {
+            pendingLock.writeLock().unlock();
         }
-        return false;
     }
 
     private boolean removeFromPending(Path path) {
-        if (pendingInconsistentPaths.contains(path)) {
-            pendingLock.writeLock().lock();
-            try {
-                if (pendingInconsistentPaths.contains(path)) {
-                    pendingInconsistentPaths.remove(path);
-                    return true;
-                }
-            } finally {
-                pendingLock.writeLock().unlock();
+        pendingLock.writeLock().lock();
+        try {
+            if (pendingInconsistentPaths.contains(path)) {
+                pendingInconsistentPaths.remove(path);
+                return true;
             }
+            return false;
+        } finally {
+            pendingLock.writeLock().unlock();
         }
-        return false;
     }
 
     private Runnable updateTask(final FileWrapper file) {
@@ -398,6 +396,7 @@ public class WordToPathIndex {
                     if (!pathFilter.accept(path)) {
                         log.trace("ignore {}", path);
                     } else {
+                        log.trace("accept {}", path);
                         fsRegistrar.register(path);
                         submitUpdateTask(path);
                     }
@@ -406,10 +405,11 @@ public class WordToPathIndex {
 
                 @Override
                 public FileVisitResult preVisitDirectory(Path dir, BasicFileAttributes attrs) throws IOException {
-                    if (!pathFilter.accept(dirPath)) {
-                        log.trace("ignore {}", dirPath);
+                    if (!pathFilter.accept(dir)) {
+                        log.trace("ignore {}", dir);
                         return FileVisitResult.SKIP_SUBTREE;
                     }
+                    log.trace("accept {}", dir);
                     fsRegistrar.register(dir);
                     return FileVisitResult.CONTINUE;
                 }
@@ -438,6 +438,7 @@ public class WordToPathIndex {
                 log.trace("ignore {}", path);
                 return;
             }
+            log.trace("accept {}", path);
             fsRegistrar.register(path);
             submitUpdateTask(path);
         }
@@ -449,6 +450,7 @@ public class WordToPathIndex {
                 log.trace("ignore {}", path);
                 return;
             }
+            log.trace("accept {}", path);
             fsRegistrar.register(path);
             submitUpdateTask(path);
         }
@@ -517,7 +519,7 @@ public class WordToPathIndex {
             checkNotNull(properties, "properties");
             this.indexingThreadsCountProperty = Integer.parseInt(properties.getProperty(
                     INDEXING_THREADS_COUNT_PROPERTY,
-                    String.valueOf(3 * Runtime.getRuntime().availableProcessors())));
+                    String.valueOf(Runtime.getRuntime().availableProcessors())));
             this.blockRequestProperty = Boolean.parseBoolean(properties.getProperty(
                     BLOCK_REQUEST_PROPERTY, "false"));
             this.maxAvailableFileSizeProperty = Long.parseLong(properties.getProperty(

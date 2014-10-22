@@ -23,6 +23,7 @@ public class CommandLineRunner {
             "       add <path> -- start watch directory `path`. If path is not absolute, relative to current directory path will be used.\n" +
             "       rm <path> -- stop watch `path`.\n" +
             "       remove <path> -- see `rm` command.\n" +
+            "       count <word> -- count of files contain the `word`.\n" +
             "       find <word> -- print all file-paths `word` is contained in. Note: `word` should be without whitespaces.\n";
 
     public static final String PROMPT = ">> ";

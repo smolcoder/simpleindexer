@@ -36,7 +36,7 @@ public class FSRegistrar {
         public WatchKey register(@NotNull Path root) throws IOException;
     }
 
-    private final Logger log = LoggerFactory.getLogger(FSRegistrar.class);
+    private static final Logger log = LoggerFactory.getLogger(FSRegistrar.class);
 
     private final Map<Path, FSEntry> fs = new THashMap<>();
     private final ReentrantReadWriteLock fsLock = new ReentrantReadWriteLock();

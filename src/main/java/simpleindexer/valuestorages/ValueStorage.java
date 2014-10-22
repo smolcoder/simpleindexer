@@ -40,4 +40,9 @@ public interface ValueStorage<E> {
      */
     public ValueStorage<E> copy();
 
+    /**
+     * Checks whether value storage is empty.
+     */
+    public boolean isEmpty();
+
 }
