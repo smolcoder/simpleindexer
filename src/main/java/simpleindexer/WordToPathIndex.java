@@ -89,7 +89,7 @@ public class WordToPathIndex {
         log.info("Properties: {}", properties);
         File ignore = new File(this.properties.getIgnoreListProperty());
         int nThreads = properties.getIndexingThreadsCountProperty();
-        executor = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, executorQueue);
+        executor = new ThreadPoolExecutor(nThreads, nThreads, 1000L, TimeUnit.MILLISECONDS, executorQueue);
         pathFilter = ignore.isFile() ? new PathFilter(ignore) : new PathFilter();
         log.info("Use {}", pathFilter);
         FSEventDispatcher<FSEventListener> fsEventDispatcher = new FSEventDispatcher<>();
@@ -326,7 +326,8 @@ public class WordToPathIndex {
                 }
                 try {
                     index.update(file);
-                    log.info("updated {}", file);
+//                    log.debug("updated {}", file);
+                    log.info("updated {}. {}", file, dumpInfo());
                 } catch (FileTooBigIndexException | FileHasZeroLengthException e) {
                     log.warn(e.getMessage());
                 } catch (IndexException e) {
@@ -346,7 +347,8 @@ public class WordToPathIndex {
                 }
                 try {
                     index.remove(file);
-                    log.info("removed {}", file);
+//                    log.debug("removed {}", file);
+                    log.info("removed {}. {}", file, dumpInfo());
                 } catch (IndexException e) {
                     log.error("Exception while removing file from index {}: {}", file, e.getMessage());
                 }
@@ -381,6 +383,14 @@ public class WordToPathIndex {
             log.error(e.toString());
             removeFromPending(path);
         }
+    }
+
+    private String dumpInfo() {
+        // not thread-safe!
+        // used only for process progress estimating while logging
+        return "pending map: " + pendingInconsistentPaths.size() +
+                ", executor queue: " + executorQueue.size() +
+                ", registered paths: " + fsRegistrar.registeredCount();
     }
 
     private void submitUpdateTaskRecursive(final Path dirPath) {
@@ -470,10 +480,9 @@ public class WordToPathIndex {
         @Override
         public void onDeleted(final Path path) {
             checkIsRunning();
-            log.debug("Delete {}", path);
+            log.debug("delete {}", path);
             List<Path> removed = fsRegistrar.unregisterAll(path);
             for (Path p : removed) {
-                log.debug("Submit removed path {}", p);
                 submitUpdateTask(p);
             }
         }

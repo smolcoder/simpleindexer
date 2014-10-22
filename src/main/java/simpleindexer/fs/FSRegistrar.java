@@ -129,6 +129,15 @@ public class FSRegistrar {
         }
     }
 
+    public int registeredCount() {
+        readLock().lock();
+        try {
+            return fs.size();
+        } finally {
+            readLock().unlock();
+        }
+    }
+
     /*
      * Unregister prefix/* from fs.
      * Remove prefix from its parent.

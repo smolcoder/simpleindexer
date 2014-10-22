@@ -80,6 +80,7 @@ public class CommandLineRunner {
                         console.println(USAGE);
                     } else {
                         console.println("Adding " + arg[1] + " ...");
+                        console.flush();
                         index.startWatch(getPath(forRelativePaths, arg[1]));
                     }
                 } else if (cmd.startsWith("rm") || cmd.startsWith("remove"))
