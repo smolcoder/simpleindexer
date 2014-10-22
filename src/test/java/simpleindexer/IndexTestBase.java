@@ -32,7 +32,7 @@ public class IndexTestBase {
      * Also this time can be differ depending on OS (f.e. on Mac OS this time should be >1500 ms to get events,
      * but on Ubuntu 500 ms is enough.
      */
-    protected long sleepTimeBeforeMatching = 2000; // milliseconds
+    protected long sleepTimeBeforeMatching = 1500; // milliseconds
 
     protected void matchAll(String query, String... suffixes) throws InterruptedException, IndexException {
         matchAllTestDir(query, testDirPath, suffixes);

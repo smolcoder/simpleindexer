@@ -195,6 +195,7 @@ public class FunctionalTest extends IndexTestBase {
     @Test
     public void moveDirectoryTest() throws InterruptedException, IOException, IndexException {
         Files.move(Paths.get(testDirPath, "bar1/bar2/bar3/bar4"), Paths.get(testDirPath, "mbar4"));
+        Thread.sleep(500);
         Files.move(Paths.get(testDirPath, "foo1/bar2"), Paths.get(testDirPath, "foo1/mbar2"));
         Thread.sleep(2 * sleepTimeBeforeMatching);
         matchAll("Hello", "foo1/foo2/foo3/file1", "bar1/bar2/foo3/file1", "foo1/foo2/file1", "mbar4/file1");

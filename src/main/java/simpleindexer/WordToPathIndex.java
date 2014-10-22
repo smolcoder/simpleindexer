@@ -364,7 +364,7 @@ public class WordToPathIndex {
         try {
             indexTaskExecutor.submit(updateTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
-            log.error(e.toString());
+            log.warn(e.toString());
             removeFromPending(path);
         }
     }
@@ -379,7 +379,7 @@ public class WordToPathIndex {
         try {
             indexTaskExecutor.submit(removeTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
-            log.error(e.toString());
+            log.warn(e.toString());
             removeFromPending(path);
         }
     }
