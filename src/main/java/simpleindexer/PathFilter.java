@@ -5,10 +5,12 @@ import org.slf4j.LoggerFactory;
 import simpleindexer.fs.FileWrapper;
 
 import java.io.*;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Properties;
 import java.util.regex.Pattern;
 
 /**
@@ -20,8 +22,10 @@ public class PathFilter {
 
     private List<Pattern> patterns;
 
-    public PathFilter(File file) throws IOException {
-        this();
+    private WordToPathIndex.IndexProperties properties;
+
+    public PathFilter(File file, WordToPathIndex.IndexProperties properties) throws IOException {
+        this(properties);
         BufferedReader in = new BufferedReader(new FileReader(file));
         String line = in.readLine();
         while (line != null) {
@@ -32,8 +36,9 @@ public class PathFilter {
         }
     }
 
-    public PathFilter() {
+    public PathFilter(WordToPathIndex.IndexProperties properties) {
         patterns = new ArrayList<>();
+        this.properties = properties;
     }
 
     public boolean accept(Path path) {
@@ -46,6 +51,8 @@ public class PathFilter {
                 return false;
             }
         }
+        if (properties.isSkipFilesWithoutExt() && Files.isRegularFile(Paths.get(path)) && !path.contains("."))
+            return false;
         return defaultAccept(path);
     }
 

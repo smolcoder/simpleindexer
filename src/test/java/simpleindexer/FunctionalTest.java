@@ -60,7 +60,9 @@ public class FunctionalTest extends IndexTestBase {
         createAndWrite(TEXT_A, testDirPath,   "bar1", "bar2", "foo3", "bar4", "file1");
 
         // use default IndexProperties
-        index = new WordToPathIndex(FileSystems.getDefault(), testDir);
+        Properties testProp = new Properties();
+        testProp.setProperty(WordToPathIndex.IndexProperties.SKIP_FILES_WITHOUT_EXT_PROPERTY, "false");
+        index = new WordToPathIndex(FileSystems.getDefault(), new WordToPathIndex.IndexProperties(testProp), testDir);
         try {
             Thread.sleep(sleepTimeBeforeMatching);
         } catch (InterruptedException e) {
@@ -70,6 +72,7 @@ public class FunctionalTest extends IndexTestBase {
 
     @Test
     public void afterIndexInitializeQueryTest() throws InterruptedException, IndexException {
+        matchAll("aaaa", "bar1/bar2/foo3/bar4/file1", "bar1/file1", "foo1/bar2/file1", "foo1/file1");
         matchAll("Hello", "foo1/foo2/foo3/file1", "bar1/bar2/foo3/file1", "foo1/foo2/file1", "bar1/bar2/bar3/bar4/file1");
         matchCount("abracadabra", 0);
         matchCount("a", 6);
@@ -77,7 +80,6 @@ public class FunctionalTest extends IndexTestBase {
         matchAll("bb", "bar1/bar2/file1", "foo1/file2");
         matchAll("bbb", "bar1/bar2/bar3/bar4/file1", "bar1/bar2/file1", "foo1/file2", "/foo1/foo2/file1");
         matchAll("cccc", "bar1/bar2/file2", "foo1/file3", "foo1/bar2/foo3/foo4/file1");
-        matchAll("aaaa", "bar1/bar2/foo3/bar4/file1", "bar1/file1", "foo1/bar2/file1", "foo1/file1");
         matchCount("bbbb", 2);
         matchAll("designed", "bar1/bar2/bar3/bar4/file1", "foo1/foo2/file1");
         matchCount("Java", 2);

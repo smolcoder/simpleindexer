@@ -61,10 +61,10 @@ public class StringStringMemoIndex implements Index<String, String, FileWrapper>
 
         @Override
         public void update(FileWrapper file) throws IndexException {
+            remove(file);
             if (!Files.isRegularFile(file.getPath())) {
                 return;
             }
-            remove(file);
             Set<String> newData = dataIndexer.index(file).keySet();
             String path = file.getPath().toString();
             lock.writeLock().lock();

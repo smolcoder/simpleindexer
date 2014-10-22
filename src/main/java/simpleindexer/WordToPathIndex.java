@@ -1,7 +1,6 @@
 package simpleindexer;
 
 import com.sun.nio.file.SensitivityWatchEventModifier;
-import gnu.trove.set.hash.THashSet;
 import simpleindexer.exceptions.FileHasZeroLengthException;
 import simpleindexer.exceptions.FileTooBigIndexException;
 import simpleindexer.exceptions.IndexException;
@@ -35,7 +34,7 @@ import static simpleindexer.utils.IndexerUtils.checkNotNull;
  * {@link simpleindexer.fs.FSWatcher}. Then {@link simpleindexer.fs.FSWatcher} calls
  * {@link simpleindexer.fs.FSEventDispatcher#dispatch(simpleindexer.fs.FSEvent)}, which in turn distribute this event among its
  * {@link simpleindexer.fs.FSEventListener}. In this implementation there is special {@link simpleindexer.fs.FSEventListener}
- * which used to submitting {@link java.lang.Runnable tasks} for index update to {@link java.util.concurrent.ExecutorService executor}.
+ * which used to submitting {@link java.lang.Runnable tasks} for index update to {@link java.util.concurrent.ExecutorService indexTaskExecutor}.
  * Each task use {@link simpleindexer.TextFileIndexer} to extract words from {@link simpleindexer.fs.FileWrapper}. Also you can
  * implement your own {@link simpleindexer.DataIndexer} using custom {@link simpleindexer.tokenizer.Tokenizer} to parse file on your own way.
  * Then extracted data is merged into {@link simpleindexer.Index index}.
@@ -62,13 +61,14 @@ public class WordToPathIndex {
 
     private final WatchEvent.Kind[] EVENTS = new WatchEvent.Kind[]{ENTRY_CREATE, ENTRY_DELETE, ENTRY_MODIFY};
     private final WatchService watchService;
-    private final Set<Path> pendingInconsistentPaths = new THashSet<>();
+    private final Set<Path> pendingInconsistentPaths = new ConcurrentSkipListSet<>();
     private final ReentrantReadWriteLock pendingLock = new ReentrantReadWriteLock();
     private final LinkedBlockingQueue<Runnable> executorQueue = new LinkedBlockingQueue<>();
     private final IndexProperties properties;
     private final FSWatcher fsWatcher;
     private FSRegistrar fsRegistrar;
-    private ExecutorService executor;
+    private ExecutorService indexTaskExecutor;
+    private ExecutorService traversalExecutor;
     private Index<String, String, FileWrapper> index;
     private volatile boolean isTerminated;
     private final PathFilter pathFilter;
@@ -82,15 +82,16 @@ public class WordToPathIndex {
      * @param path which content will be used for indexing by default.
      * @throws IOException
      */
-    public WordToPathIndex(@NotNull final FileSystem fileSystem, @NotNull IndexProperties properties, Path path) throws IOException {
+    public WordToPathIndex(@NotNull final FileSystem fileSystem, @NotNull IndexProperties properties, final Path path) throws IOException {
         log.info("Initializing index...");
         this.watchService = checkNotNull(fileSystem, "fileSystem").newWatchService();
         this.properties = checkNotNull(properties, "properties");
         log.info("Properties: {}", properties);
         File ignore = new File(this.properties.getIgnoreListProperty());
         int nThreads = properties.getIndexingThreadsCountProperty();
-        executor = new ThreadPoolExecutor(nThreads, nThreads, 1000L, TimeUnit.MILLISECONDS, executorQueue);
-        pathFilter = ignore.isFile() ? new PathFilter(ignore) : new PathFilter();
+        indexTaskExecutor = new ThreadPoolExecutor(nThreads, nThreads, 0L, TimeUnit.MILLISECONDS, executorQueue);
+        traversalExecutor = Executors.newFixedThreadPool(3);
+        pathFilter = ignore.isFile() ? new PathFilter(ignore, this.properties) : new PathFilter(this.properties);
         log.info("Use {}", pathFilter);
         FSEventDispatcher<FSEventListener> fsEventDispatcher = new FSEventDispatcher<>();
         fsWatcher = new FSWatcher(watchService, fsEventDispatcher);
@@ -176,16 +177,16 @@ public class WordToPathIndex {
      *
      * @param root start watching to.
      */
-    public void startWatch(Path root) throws NoSuchFileException {
+    public void startWatch(final Path root) throws NoSuchFileException {
         if (!Files.isDirectory(root)) {
             throw new NoSuchFileException(root + " is not a directory.");
         }
-        log.info("Start watching {}", root);
         if (fsRegistrar.isRegistered(root)) {
             log.warn("Path {} is already registered.", root);
             return;
         }
-        submitUpdateTaskRecursive(root);
+        log.info("Start watching {}", root);
+        submitTaskToRecursiveUpdate(root);
     }
 
     /**
@@ -204,16 +205,12 @@ public class WordToPathIndex {
      *
      * @param root stop watching to.
      */
-    public void stopWatch(Path root) throws NoSuchFileException {
+    public void stopWatch(final Path root) throws NoSuchFileException {
         if (!fsRegistrar.isDirectory(root)) {
             throw new NoSuchFileException("Directory " + root + " is not watched.");
         }
         log.info("Stop watching {}", root);
-        List<Path> removed = fsRegistrar.unregisterAll(root);
-        for (Path p : removed) {
-            log.debug("Submit removed path {}", p);
-            submitRemoveTask(p);
-        }
+        submitTaskToRecursiveRemove(root);
     }
 
     /**
@@ -260,7 +257,7 @@ public class WordToPathIndex {
     /**
      * Shutdown index.
      * <p>
-     * This method performs {@link java.util.concurrent.ExecutorService#shutdownNow() executor.shutdownNow()},
+     * This method performs {@link java.util.concurrent.ExecutorService#shutdownNow() indexTaskExecutor.shutdownNow()},
      * {@link simpleindexer.fs.FSWatcher#stop()} and {@link Index#clear()}.
      * @throws IndexException
      */
@@ -279,7 +276,8 @@ public class WordToPathIndex {
             log.warn("Index is already stopped.");
             return;
         }
-        executor.shutdownNow();
+        indexTaskExecutor.shutdownNow();
+        traversalExecutor.shutdownNow();
         fsWatcher.stop();
         index.clear();
         log.info("Index is stopped.");
@@ -289,31 +287,34 @@ public class WordToPathIndex {
         return this.properties;
     }
 
-    // TODO make double-checked locking
     private boolean moveToPending(Path path) {
-        pendingLock.writeLock().lock();
-        try {
-            if (!pendingInconsistentPaths.contains(path)) {
-                pendingInconsistentPaths.add(path);
-                return true;
+        if (!pendingInconsistentPaths.contains(path)) {
+            pendingLock.writeLock().lock();
+            try {
+                if (!pendingInconsistentPaths.contains(path)) {
+                    pendingInconsistentPaths.add(path);
+                    return true;
+                }
+            } finally {
+                pendingLock.writeLock().unlock();
             }
-            return false;
-        } finally {
-            pendingLock.writeLock().unlock();
         }
+        return false;
     }
 
     private boolean removeFromPending(Path path) {
-        pendingLock.writeLock().lock();
-        try {
-            if (pendingInconsistentPaths.contains(path)) {
-                pendingInconsistentPaths.remove(path);
-                return true;
+        if (pendingInconsistentPaths.contains(path)) {
+            pendingLock.writeLock().lock();
+            try {
+                if (pendingInconsistentPaths.contains(path)) {
+                    pendingInconsistentPaths.remove(path);
+                    return true;
+                }
+            } finally {
+                pendingLock.writeLock().unlock();
             }
-            return false;
-        } finally {
-            pendingLock.writeLock().unlock();
         }
+        return false;
     }
 
     private Runnable updateTask(final FileWrapper file) {
@@ -326,8 +327,7 @@ public class WordToPathIndex {
                 }
                 try {
                     index.update(file);
-//                    log.debug("updated {}", file);
-                    log.info("updated {}. {}", file, dumpInfo());
+                    log.info("updated {}", file);
                 } catch (FileTooBigIndexException | FileHasZeroLengthException e) {
                     log.warn(e.getMessage());
                 } catch (IndexException e) {
@@ -347,8 +347,7 @@ public class WordToPathIndex {
                 }
                 try {
                     index.remove(file);
-//                    log.debug("removed {}", file);
-                    log.info("removed {}. {}", file, dumpInfo());
+                    log.info("removed {}", file);
                 } catch (IndexException e) {
                     log.error("Exception while removing file from index {}: {}", file, e.getMessage());
                 }
@@ -361,9 +360,9 @@ public class WordToPathIndex {
         if (!moveToPending(path)) {
             return;
         }
-        log.info("submit to update {}.", path);
+        log.info("submit to update {}. Registered: {}", path, fsRegistrar.registeredCount());
         try {
-            executor.submit(updateTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
+            indexTaskExecutor.submit(updateTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
             log.error(e.toString());
             removeFromPending(path);
@@ -376,21 +375,13 @@ public class WordToPathIndex {
             log.warn("file already scheduled: {}", path);
             return;
         }
-        log.debug("submit remove {}", path);
+        log.debug("submit remove {}. Registered: {}", path, fsRegistrar);
         try {
-            executor.submit(removeTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
+            indexTaskExecutor.submit(removeTask(new FileWrapper(path, properties.getMaxAvailableFileSizeProperty())));
         } catch (RejectedExecutionException e) {
             log.error(e.toString());
             removeFromPending(path);
         }
-    }
-
-    private String dumpInfo() {
-        // not thread-safe!
-        // used only for process progress estimating while logging
-        return "pending map: " + pendingInconsistentPaths.size() +
-                ", executor queue: " + executorQueue.size() +
-                ", registered paths: " + fsRegistrar.registeredCount();
     }
 
     private void submitUpdateTaskRecursive(final Path dirPath) {
@@ -427,6 +418,27 @@ public class WordToPathIndex {
         } catch (IOException e) {
             log.error("Error while recursive updating {}: {}", dirPath, e);
         }
+    }
+
+    private void submitTaskToRecursiveRemove(final Path path) {
+        traversalExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                List<Path> removed = fsRegistrar.unregisterAll(path);
+                for (Path p : removed) {
+                    submitRemoveTask(p);
+                }
+            }
+        });
+    }
+
+    private void submitTaskToRecursiveUpdate(final Path path) {
+        traversalExecutor.submit(new Runnable() {
+            @Override
+            public void run() {
+                submitUpdateTaskRecursive(path);
+            }
+        });
     }
 
     private void checkIsRunning() {
@@ -468,7 +480,7 @@ public class WordToPathIndex {
         @Override
         public void onDirectoryCreated(final Path path) {
             checkIsRunning();
-            submitUpdateTaskRecursive(path);
+            submitTaskToRecursiveUpdate(path);
         }
 
         @Override
@@ -481,10 +493,8 @@ public class WordToPathIndex {
         public void onDeleted(final Path path) {
             checkIsRunning();
             log.debug("delete {}", path);
-            List<Path> removed = fsRegistrar.unregisterAll(path);
-            for (Path p : removed) {
-                submitUpdateTask(p);
-            }
+            submitTaskToRecursiveRemove(path);
+
         }
 
         @Override
@@ -499,7 +509,7 @@ public class WordToPathIndex {
     public static class IndexProperties {
 
         /**
-         * Threads count used by {@link java.util.concurrent.ExecutorService executor} while executing updating tasks.
+         * Threads count used by {@link java.util.concurrent.ExecutorService indexTaskExecutor} while executing updating tasks.
          */
         public final static String INDEXING_THREADS_COUNT_PROPERTY = "indexer.threads.count";
         /**
@@ -518,9 +528,14 @@ public class WordToPathIndex {
          * .*\.zip -- ignore all files with .zip extension.
          */
         public final static String IGNORE_LIST_PROPERTY = "indexer.ignore.list.file";
+        /**
+         * Whether indexer should skip files without extension.
+         */
+        public final static String SKIP_FILES_WITHOUT_EXT_PROPERTY = "indexer.skip.noext";
 
         private int indexingThreadsCountProperty;
         private boolean blockRequestProperty;
+        private boolean skipFilesWithoutExt;
         private long maxAvailableFileSizeProperty;
         private String ignoreListFilePath;
 
@@ -528,9 +543,11 @@ public class WordToPathIndex {
             checkNotNull(properties, "properties");
             this.indexingThreadsCountProperty = Integer.parseInt(properties.getProperty(
                     INDEXING_THREADS_COUNT_PROPERTY,
-                    String.valueOf(Runtime.getRuntime().availableProcessors())));
+                    String.valueOf((3 * Runtime.getRuntime().availableProcessors() + 1) / 2)));
             this.blockRequestProperty = Boolean.parseBoolean(properties.getProperty(
                     BLOCK_REQUEST_PROPERTY, "false"));
+            this.skipFilesWithoutExt = Boolean.parseBoolean(properties.getProperty(
+                    SKIP_FILES_WITHOUT_EXT_PROPERTY, "true"));
             this.maxAvailableFileSizeProperty = Long.parseLong(properties.getProperty(
                     MAX_AVAILABLE_FILE_SIZE_PROPERTY, String.valueOf(30 * 1024 * 1024L)));
             this.ignoreListFilePath = properties.getProperty(
@@ -548,6 +565,9 @@ public class WordToPathIndex {
         public boolean isBlockRequestProperty() {
             return blockRequestProperty;
         }
+        public boolean isSkipFilesWithoutExt() {
+            return skipFilesWithoutExt;
+        }
 
         public long getMaxAvailableFileSizeProperty() {
             return maxAvailableFileSizeProperty;
@@ -562,6 +582,7 @@ public class WordToPathIndex {
             StringBuilder sb = new StringBuilder();
             sb.append(INDEXING_THREADS_COUNT_PROPERTY).append("=").append(indexingThreadsCountProperty).append("; ");
             sb.append(BLOCK_REQUEST_PROPERTY).append("=").append(blockRequestProperty).append("; ");
+            sb.append(SKIP_FILES_WITHOUT_EXT_PROPERTY).append("=").append(skipFilesWithoutExt).append("; ");
             sb.append(IGNORE_LIST_PROPERTY).append("=").append(ignoreListFilePath).append("; ");
             sb.append(MAX_AVAILABLE_FILE_SIZE_PROPERTY).append("=").append(maxAvailableFileSizeProperty).append(";");
             return sb.toString();

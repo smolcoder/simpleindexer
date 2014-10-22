@@ -21,7 +21,8 @@ public class CommandLineRunner {
             "Usage: q -- quit this program.\n" +
             "       h -- print help.\n" +
             "       add <path> -- start watch directory `path`. If path is not absolute, relative to current directory path will be used.\n" +
-            "       rm <path> -- stop watch `path`.\n" +
+            "       rm <path> -- stop watch `path`. It isn't remove directory from disk. So if you call `rm path/` while indexing path/," +
+                    "so you just remove all watched at _that_ time paths with prefix path/.\n" +
             "       remove <path> -- see `rm` command.\n" +
             "       count <word> -- count of files contain the `word`.\n" +
             "       find <word> -- print all file-paths `word` is contained in. Note: `word` should be without whitespaces.\n";
@@ -79,8 +80,8 @@ public class CommandLineRunner {
                     if (arg.length != 2) {
                         console.println(USAGE);
                     } else {
-                        console.println("Adding " + arg[1] + " ...");
-                        console.flush();
+//                        console.println("Adding " + arg[1] + " ...");
+//                        console.flush();
                         index.startWatch(getPath(forRelativePaths, arg[1]));
                     }
                 } else if (cmd.startsWith("rm") || cmd.startsWith("remove"))
